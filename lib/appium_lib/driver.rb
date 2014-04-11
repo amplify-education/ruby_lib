@@ -309,6 +309,8 @@ module Appium
       @no_reset = false if @full_reset
       @full_reset = false if @no_reset
 
+      @selendroid = opts.fetch :selendroid, false
+
       # load common methods
       extend Appium::Common
       if @device.downcase == 'android'
@@ -395,6 +397,9 @@ module Appium
       }.merge(@android_coverage).merge(@raw_capabilities)
     end
 
+    def selendroid_capabilities
+      { automationName: 'selendroid' }
+    end
     # @private
     # WebDriver capabilities. Must be valid for Sauce to work.
     def ios_capabilities
@@ -408,7 +413,8 @@ module Appium
 
     # @private
     def capabilities
-      caps = @device.downcase === 'android' ? android_capabilities : ios_capabilities
+      caps = 'android' === @device.downcase ? android_capabilities : ios_capabilities
+      caps = @selendroid ? caps.merge(selendroid_capabilities) : caps
       caps[:app] = self.class.absolute_app_path(@app_path) unless @app_path.nil? || @app_path.empty?
       caps
     end
@@ -614,6 +620,30 @@ module Appium
       raise 'Method must have .to_s' unless method.respond_to? :to_s
 
       @driver.execute_script "mobile: #{method.to_s}", *args
+    end
+
+    def switch_to_window view_type
+      window_types = @driver.window_handles
+      raise "Unsupported View Type" if !window_types.include? view_type
+      @driver.switch_to.window viewType
+    end
+
+    def switch_to_webview
+      window_types = @driver.window_handles
+      webview_type = window_types.find { |type| /WEBVIEW/ =~ type }
+      if webview_type.nil?
+        raise "No Webview to switch to, existing window types are #{window_types}"
+      end
+      @driver.switch_to.window webview_type
+    end
+
+    def switch_to_native
+      window_types = @driver.window_handles
+      native_type = window_types.find { |type| /NATIVE/ =~ type }
+      if native_type.nil?
+        raise "No Native View to switch to, existing window types are #{window_types}"
+      end
+      @driver.switch_to.window native_type
     end
 
     # Calls @driver.find_elements
